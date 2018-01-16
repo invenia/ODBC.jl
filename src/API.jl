@@ -72,34 +72,37 @@ macro odbc(func,args,vals...)
     end
 end
 
+println("Processing Drivers and DataSource")
+
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms712400(v=vs.85).aspx"
 function SQLDrivers(env::Ptr{Void},
                     dir,
-                    driver_desc::Ptr{SQLWCHAR},
+                    driver_desc::Ptr{T},
                     desclen,
                     desc_length::Ref{SQLSMALLINT},
-                    driver_attr::Ptr{SQLWCHAR},
+                    driver_attr::Ptr{T},
                     attrlen,
-                    attr_length::Ref{SQLSMALLINT})
+                    attr_length::Ref{SQLSMALLINT}) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLDriversW,
-                (Ptr{Void}, SQLUSMALLINT, Ptr{SQLWCHAR}, SQLSMALLINT, Ref{SQLSMALLINT}, Ptr{SQLWCHAR}, SQLSMALLINT, Ref{SQLSMALLINT}),
+                (Ptr{Void}, SQLUSMALLINT, parse("Ptr{$T}"), SQLSMALLINT, Ref{SQLSMALLINT}, parse("Ptr{$T}"), SQLSMALLINT, Ref{SQLSMALLINT}),
                 env, dir, driver_desc, desclen, desc_length, driver_attr, attrlen, attr_length)
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711004(v=vs.85).aspx"
 function SQLDataSources(env::Ptr{Void},
                         dir,
-                        dsn_desc::Ptr{SQLWCHAR},
+                        dsn_desc::Ptr{T},
                         desclen,
                         desc_length::Ref{SQLSMALLINT},
-                        dsn_attr::Ptr{SQLWCHAR},
+                        dsn_attr::Ptr{T},
                         attrlen,
                         attr_length::Ref{SQLSMALLINT})
     @odbc(:SQLDataSourcesW,
-                (Ptr{Void}, SQLUSMALLINT, Ptr{SQLWCHAR}, SQLSMALLINT, Ref{SQLSMALLINT}, Ptr{SQLWCHAR}, SQLSMALLINT, Ref{SQLSMALLINT}),
+                (Ptr{Void}, SQLUSMALLINT, parse("Ptr{$T}"), SQLSMALLINT, Ref{SQLSMALLINT}, parse("Ptr{$T}"), SQLSMALLINT, Ref{SQLSMALLINT}),
                 env, dir, dsn_desc, desclen, desc_length, dsn_attr, attrlen, attr_length)
 end
 
+println("Processed Drivers and DataSource")
 #### Handle Functions ####
 
 # SQLAllocHandle
@@ -258,6 +261,8 @@ function SQLGetConnectAttr(dbc::Ptr{Void},attribute::Int,value::Array{T,N},bytes
                 dbc,attribute,value,sizeof(T)*N,bytes_returned)
 end
 
+println("SQLGetConnectAttr processed")
+
 #SQLSetStmtAttr
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms712631(v=vs.85).aspx"
 #Description: sets attributes related to a statement.
@@ -346,9 +351,10 @@ end
 # Description: establishes connections to a driver and a data source
 # Status:
 function SQLConnect(dbc::Ptr{Void},dsn,username,password)
+    T = sql_w_char()
     @odbc(:SQLConnectW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                dbc,transcode(SQLWCHAR,dsn),length(transcode(SQLWCHAR,dsn)),transcode(SQLWCHAR,username),length(transcode(SQLWCHAR,username)),transcode(SQLWCHAR,password),length(transcode(SQLWCHAR,password)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                dbc,transcode(sql_w_char(),dsn),length(transcode(sql_w_char(),dsn)),transcode(sql_w_char(),username),length(transcode(sql_w_char(),username)),transcode(sql_w_char(),password),length(transcode(sql_w_char(),password)))
 end
 
 #SQLDriverConnect
@@ -360,19 +366,19 @@ const SQL_DRIVER_COMPLETE_REQUIRED = UInt16(3)
 const SQL_DRIVER_NOPROMPT = UInt16(0)
 const SQL_DRIVER_PROMPT = UInt16(2)
 #Status:
-function SQLDriverConnect(dbc::Ptr{Void},window_handle::Ptr{Void},conn_string,out_conn::Ptr{SQLWCHAR},out_len,out_buff::Ref{Int16},driver_prompt)
+function SQLDriverConnect(dbc::Ptr{Void},window_handle::Ptr{Void},conn_string,out_conn::Ptr{SQLWCHAR},out_len,out_buff::Ref{Int16},driver_prompt) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLDriverConnectW,
-                (Ptr{Void},Ptr{Void},Ptr{SQLWCHAR},SQLSMALLINT,Ptr{SQLWCHAR},SQLSMALLINT,Ptr{SQLSMALLINT},SQLUSMALLINT),
-                dbc,window_handle,transcode(SQLWCHAR,conn_string),length(transcode(SQLWCHAR,conn_string)),out_conn,out_len,out_buff,driver_prompt)
+                (Ptr{Void},Ptr{Void},Ptr{T},SQLSMALLINT,Ptr{T},SQLSMALLINT,Ptr{SQLSMALLINT},SQLUSMALLINT),
+                dbc,window_handle,transcode(T,conn_string),length(transcode(T,conn_string)),out_conn,out_len,out_buff,driver_prompt)
 end
 #SQLBrowseConnect
  "http://msdn.microsoft.com/en-us/library/windows/desktop/ms714565(v=vs.85).aspx"
  #Description: supports an iterative method of discovering and enumerating the attributes and attribute values required to connect to a data source
  #Status:
-function SQLBrowseConnect(dbc::Ptr{Void},instring::AbstractString,outstring::Array{SQLWCHAR,1},indicator::Array{Int16,1})
+function SQLBrowseConnect(dbc::Ptr{Void},instring::AbstractString,outstring::Array{T,1},indicator::Array{Int16,1}) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLBrowseConnectW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{Int16}),
-                dbc,transcode(SQLWCHAR,instring),length(transcode(SQLWCHAR,instring)),transcode(SQLWCHAR,outstring),length(transcode(SQLWCHAR,outstring)),indicator)
+                (Ptr{Void},Ptr{T},Int16,Ptr{T},Int16,Ptr{Int16}),
+                dbc,transcode(T,instring),length(transcode(T,instring)),transcode(T,outstring),length(transcode(T,outstring)),indicator)
 end
 #SQLDisconnect
  "http://msdn.microsoft.com/en-us/library/windows/desktop/ms713946(v=vs.85).aspx"
@@ -411,10 +417,10 @@ end
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms714575(v=vs.85).aspx"
 #Description: returns the SQL string as modified by the driver
 #Status:
-function SQLNativeSql(dbc::Ptr{Void},query_string::AbstractString,output_string::Array{SQLWCHAR,1},length_ind::Array{Int,1})
+function SQLNativeSql(dbc::Ptr{Void},query_string::AbstractString,output_string::Array{T,1},length_ind::Array{Int,1}) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLNativeSql,
-                (Ptr{Void},Ptr{SQLWCHAR},Int,Ptr{SQLWCHAR},Int,Ptr{Int}),
-                dbc,transcode(SQLWCHAR,query_string),length(transcode(SQLWCHAR,query_string)),output_string,length(output_string),length_ind)
+                (Ptr{Void},Ptr{T},Int,Ptr{T},Int,Ptr{Int}),
+                dbc,transcode(T,query_string),length(transcode(T,query_string)),output_string,length(output_string),length_ind)
 end
 
 #SQLGetTypeInfo
@@ -438,9 +444,10 @@ end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms710926(v=vs.85).aspx"
 function SQLPrepare(stmt::Ptr{Void},query_string::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLPrepareW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,query_string),length(transcode(SQLWCHAR,query_string)))
+                (Ptr{Void},Ptr{T},Int16),
+                stmt,transcode(sql_w_char(),query_string),length(transcode(sql_w_char(),query_string)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms713584(v=vs.85).aspx"
@@ -455,9 +462,10 @@ end
 #Description: executes a preparable statement
 #Status:
 function SQLExecDirect(stmt::Ptr{Void},query::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLExecDirectW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int),
-                stmt,transcode(SQLWCHAR,query),length(transcode(SQLWCHAR,query)))
+                (Ptr{Void},Ptr{T},Int),
+                stmt,transcode(sql_w_char(),query),length(transcode(sql_w_char(),query)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms714112(v=vs.85).aspx"
@@ -490,9 +498,9 @@ end
 # end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms716289(v=vs.85).aspx"
-function SQLDescribeCol(stmt,x,nm::Ptr{SQLWCHAR},nmlen,len::Ref{Int16},dt::Ref{Int16},cs::Ref{SQLULEN},dd::Ref{Int16},nul::Ref{Int16})
+function SQLDescribeCol(stmt,x,nm::Ptr{T},nmlen,len::Ref{Int16},dt::Ref{Int16},cs::Ref{SQLULEN},dd::Ref{Int16},nul::Ref{Int16}) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLDescribeColW,
-                (Ptr{Void},SQLUSMALLINT,Ptr{SQLWCHAR},SQLSMALLINT,Ref{SQLSMALLINT},Ref{SQLSMALLINT},Ref{SQLULEN},Ref{SQLSMALLINT},Ref{SQLSMALLINT}),
+                (Ptr{Void},SQLUSMALLINT,Ptr{T},SQLSMALLINT,Ref{SQLSMALLINT},Ref{SQLSMALLINT},Ref{SQLULEN},Ref{SQLSMALLINT},Ref{SQLSMALLINT}),
                 stmt,x,nm,nmlen,len,dt,cs,dd,nul)
 end
 
@@ -544,16 +552,18 @@ end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711707(v=vs.85).aspx"
 function SQLSetCursorName(stmt::Ptr{Void},cursor::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLSetCursorNameW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,cursor),length(transcode(SQLWCHAR,cursor)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),cursor),length(transcode(sql_w_char(),cursor)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms716209(v=vs.85).aspx"
 function SQLGetCursorName(stmt::Ptr{Void},cursor::Array{UInt8,1},cursor_length::Array{Int16,1})
+    T = sql_w_char()
     @odbc(:SQLGetCursorNameW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{Int16}),
-                stmt,transcode(SQLWCHAR,cursor),length(transcode(SQLWCHAR,cursor)),cursor_length)
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{Int16}),
+                stmt,transcode(sql_w_char(),cursor),length(transcode(sql_w_char(),cursor)),cursor_length)
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms715441(v=vs.85).aspx"
@@ -652,58 +662,65 @@ end
 #### DBMS Meta Functions ####
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711683(v=vs.85).aspx"
 function SQLColumns(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString,column::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLColumnsW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)),transcode(SQLWCHAR,column),length(transcode(SQLWCHAR,column)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)),transcode(sql_w_char(),column),length(transcode(sql_w_char(),column)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms716336(v=vs.85).aspx"
 function SQLColumnPrivileges(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString,column::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLColumnPrivilegesW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)),transcode(SQLWCHAR,column),length(transcode(SQLWCHAR,column)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)),transcode(sql_w_char(),column),length(transcode(sql_w_char(),column)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms709315(v=vs.85).aspx"
 function SQLForeignKeys(stmt::Ptr{Void},pkcatalog::AbstractString,pkschema::AbstractString,pktable::AbstractString,fkcatalog::AbstractString,fkschema::AbstractString,fktable::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLForeignKeysW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,pkcatalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,pkschema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,pktable)),transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,fkcatalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,fkschema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,fktable)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),pkcatalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),pkschema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),pktable)),transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),fkcatalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),fkschema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),fktable)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711005(v=vs.85).aspx"
 function SQLPrimaryKeys(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLPrimaryKeysW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711701(v=vs.85).aspx"
 function SQLProcedureColumns(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,proc::AbstractString,column::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLProcedureColumnsW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),proc,length(proc),transcode(SQLWCHAR,column),length(transcode(SQLWCHAR,column)))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),proc,length(proc),transcode(sql_w_char(),column),length(transcode(sql_w_char(),column)))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms715368(v=vs.85).aspx"
 function SQLProcedures(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,proc::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLProceduresW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),proc,length(proc))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),proc,length(proc))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms711831(v=vs.85).aspx"
 function SQLTables(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString,table_type::AbstractString)
+    T = sql_w_char()
     @odbc(:SQLTablesW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)),table_type,length(table_type))
+                (Ptr{Void},Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16),
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)),table_type,length(table_type))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms713565(v=vs.85).aspx"
 function SQLTablePrivileges(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString)
     @odbc(:SQLTablePrivilegesW,
-                (Ptr{Void},Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)))
+                (Ptr{Void},Ptr{T},Int16,Ptr{T},Int16,Ptr{T},Int16),
+                stmt,transcode(T,catalog),length(transcode(T,catalog)),transcode(T,schema),length(transcode(T,schema)),transcode(T,table),length(transcode(T,table)))
 end
 
 #SQLStatistics
@@ -720,9 +737,10 @@ const SQL_ENSURE = UInt16(1)
 const SQL_QUICK = UInt16(0)
 #Status:
 function SQLStatistics(stmt::Ptr{Void},catalog::AbstractString,schema::AbstractString,table::AbstractString,unique::UInt16,reserved::UInt16)
+    T = sql_w_char()
     @odbc(:SQLStatisticsW,
                 (Ptr{Void},Ptr{UInt8},Int16,Ptr{UInt8},Int16,Ptr{UInt8},Int16,UInt16,UInt16),
-                stmt,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)),unique,reserved)
+                stmt,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)),unique,reserved)
 end
 
 #SQLSpecialColumns
@@ -741,24 +759,25 @@ const SQL_NULLABLE          = Int16(1) #SQLSpecialColumns
 #const SQL_NULLABLE_UNKNOWN = Int16() #SQLSpecialColumns
 #Status:
 function SQLSpecialColumns(stmt::Ptr{Void},id_type::Int16,catalog::AbstractString,schema::AbstractString,table::AbstractString,scope::Int16,nullable::Int16)
+    T = sql_w_char()
     @odbc(:SQLSpecialColumnsW,
-                (Ptr{Void},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Ptr{SQLWCHAR},Int16,Int16,Int16),
-                stmt,id_type,transcode(SQLWCHAR,catalog),length(transcode(SQLWCHAR,catalog)),transcode(SQLWCHAR,schema),length(transcode(SQLWCHAR,schema)),transcode(SQLWCHAR,table),length(transcode(SQLWCHAR,table)),scope,nullable)
+                (Ptr{Void},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Ptr{sql_w_char()},Int16,Int16,Int16),
+                stmt,id_type,transcode(sql_w_char(),catalog),length(transcode(sql_w_char(),catalog)),transcode(sql_w_char(),schema),length(transcode(sql_w_char(),schema)),transcode(sql_w_char(),table),length(transcode(sql_w_char(),table)),scope,nullable)
 end
 
 #### Error Handling Functions ####
 #TODO: add consts
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms710181(v=vs.85).aspx"
-function SQLGetDiagField(handletype::Int16,handle::Ptr{Void},i::Int16,diag_id::Int16,diag_info::Array{SQLWCHAR,1},buffer_length::Int16,diag_length::Array{Int16,1})
+function SQLGetDiagField(handletype::Int16,handle::Ptr{Void},i::Int16,diag_id::Int16,diag_info::Array{T,1},buffer_length::Int16,diag_length::Array{Int16,1}) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLGetDiagFieldW,
-                (Int16,Ptr{Void},Int16,Int16,Ptr{SQLWCHAR},Int16,Ptr{Int16}),
-                handletype,handle,i,diag_id,transcode(SQLWCHAR,diag_info),buffer_length,transcode(SQLWCHAR,msg_length))
+                (Int16,Ptr{Void},Int16,Int16,Ptr{T},Int16,Ptr{Int16}),
+                handletype,handle,i,diag_id,transcode(T,diag_info),buffer_length,transcode(T,msg_length))
 end
 
 "http://msdn.microsoft.com/en-us/library/windows/desktop/ms716256(v=vs.85).aspx"
-function SQLGetDiagRec(handletype,handle,i,state::Ptr{SQLWCHAR},native::Ref{SQLINTEGER},error_msg,errlen,msg_length)
+function SQLGetDiagRec(handletype,handle,i,state::Ptr{T},native::Ref{SQLINTEGER},error_msg,errlen,msg_length) where {T<:SQLWCHAR_UNION}
     @odbc(:SQLGetDiagRecW,
-                (SQLSMALLINT,Ptr{Void},SQLSMALLINT,Ptr{SQLWCHAR},Ref{SQLINTEGER},Ptr{SQLWCHAR},SQLSMALLINT,Ref{SQLSMALLINT}),
+                (SQLSMALLINT,Ptr{Void},SQLSMALLINT,Ptr{T},Ref{SQLINTEGER},Ptr{T},SQLSMALLINT,Ref{SQLSMALLINT}),
                 handletype,handle,i,state,native,error_msg,errlen,msg_length)
 end
 

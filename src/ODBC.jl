@@ -44,9 +44,9 @@ const BUFLEN = 1024
 
 function ODBCError(handle::Ptr{Void}, handletype::Int16)
     i = Int16(1)
-    state = ODBC.Block(ODBC.API.SQLWCHAR, 6)
+    state = ODBC.Block(ODBC.API.sql_w_char(), 6)
     native = Ref{ODBC.API.SQLINTEGER}()
-    error_msg = ODBC.Block(ODBC.API.SQLWCHAR, BUFLEN)
+    error_msg = ODBC.Block(ODBC.API.sql_w_char(), BUFLEN)
     msg_length = Ref{ODBC.API.SQLSMALLINT}()
     while ODBC.API.SQLGetDiagRec(handletype, handle, i, state.ptr, native, error_msg.ptr, BUFLEN, msg_length) == ODBC.API.SQL_SUCCESS
         st  = string(state, 5)
@@ -75,9 +75,9 @@ Base.@deprecate listdsns ODBC.dsns
 function drivers()
     descriptions = String[]
     attributes   = String[]
-    driver_desc = Block(ODBC.API.SQLWCHAR, BUFLEN)
+    driver_desc = Block(ODBC.API.sql_w_char(), BUFLEN)
     desc_length = Ref{ODBC.API.SQLSMALLINT}()
-    driver_attr = Block(ODBC.API.SQLWCHAR, BUFLEN)
+    driver_attr = Block(ODBC.API.sql_w_char(), BUFLEN)
     attr_length = Ref{ODBC.API.SQLSMALLINT}()
     dir = ODBC.API.SQL_FETCH_FIRST
     while ODBC.API.SQLDrivers(ENV, dir, driver_desc.ptr, BUFLEN, desc_length, driver_attr.ptr, BUFLEN, attr_length) == ODBC.API.SQL_SUCCESS
@@ -92,9 +92,9 @@ end
 function dsns()
     descriptions = String[]
     attributes   = String[]
-    dsn_desc    = Block(ODBC.API.SQLWCHAR, BUFLEN)
+    dsn_desc    = Block(ODBC.API.sql_w_char(), BUFLEN)
     desc_length = Ref{ODBC.API.SQLSMALLINT}()
-    dsn_attr    = Block(ODBC.API.SQLWCHAR, BUFLEN)
+    dsn_attr    = Block(ODBC.API.sql_w_char(), BUFLEN)
     attr_length = Ref{ODBC.API.SQLSMALLINT}()
     dir = ODBC.API.SQL_FETCH_FIRST
     while ODBC.API.SQLDataSources(ENV, dir, dsn_desc.ptr, BUFLEN, desc_length, dsn_attr.ptr, BUFLEN, attr_length) == ODBC.API.SQL_SUCCESS

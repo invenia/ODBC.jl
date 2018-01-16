@@ -1,22 +1,5 @@
 using DecFP, Missings, WeakRefStrings
 
-# Link to ODBC Driver Manager (system-dependent)
-let
-    global odbc_dm
-    if !isdefined(@__MODULE__, :odbc_dm)
-        Sys.islinux()   && (lib_choices = ["libodbc", "libodbc.so", "libodbc.so.1", "libodbc.so.2", "libodbc.so.3"])
-        Sys.iswindows() && (lib_choices = ["odbc32"])
-        Sys.isapple()   && (lib_choices = ["libodbc.2.dylib","libodbc.dylib","libiodbc","libiodbc.dylib","libiodbc.1.dylib","libiodbc.2.dylib","libiodbc.3.dylib"])
-        lib = Libdl.find_library(lib_choices)
-        const odbc_dm = lib
-    end
-end
-
-function setODBC(x)
-    global odbc_dm
-    odbc_dm = x
-end
-
 # Translation of sqltypes.h; C typealiases for SQL functions
 # http://msdn.microsoft.com/en-us/library/windows/desktop/ms716298(v=vs.85).aspx
 # http://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx
@@ -36,17 +19,27 @@ const SQLREAL =       Cfloat
 const SQLTIME =       Cuchar
 const SQLTIMESTAMP =  Cuchar
 
-if contains(odbc_dm,"iodbc")
-    const SQLWCHAR = UInt32
-    if !isdefined(Base, :transcode)
-        transcode(T, x) = wstring(x)
-    end
-else
-    # correct for windows + unixODBC
-    const SQLWCHAR = Cushort
-    if !isdefined(Base, :transcode)
-        transcode(T, x) = utf16(x)
-    end
+const SQLWCHAR_UNION = Union{UInt32, Cushort}
+
+# Link to ODBC Driver Manager (system-dependent)
+const odbc_dm = ""
+
+function find_library()
+    Sys.islinux()   && (lib_choices = ["libodbc", "libodbc.so", "libodbc.so.1", "libodbc.so.2", "libodbc.so.3"])
+    Sys.iswindows() && (lib_choices = ["odbc32"])
+    Sys.isapple()   && (lib_choices = ["libodbc.2.dylib","libodbc.dylib","libiodbc","libiodbc.dylib","libiodbc.1.dylib","libiodbc.2.dylib","libiodbc.3.dylib"])
+    return Libdl.find_library(lib_choices)
+end
+
+function setODBC(x)
+    global odbc_dm
+    odbc_dm = x
+end
+
+sql_w_char() = contains(odbc_dm,"iodbc") ? UInt32 : Cushort
+
+if !isdefined(Base, :transcode)
+    transcode(T, x) = contains(odbc_dm,"iodbc") ? wstring(x) : utf16(x)
 end
 
 # ODBC API	64-bit platform	32-bit platform
@@ -115,7 +108,7 @@ const SQLHWND =       Ptr{Void}
 # provide lowercase conversion functions for all types
 # e.g., sqlchar(x) = convert(SQLCHAR, x)
 
-for t in [:SQLCHAR, :SQLSCHAR, :SQLWCHAR, :SQLDATE, :SQLDECIMAL,
+for t in [:SQLCHAR, :SQLSCHAR, :SQLDATE, :SQLDECIMAL,
           :SQLDOUBLE, :SQLFLOAT, :SQLINTEGER, :SQLUINTEGER,
           :SQLSMALLINT, :SQLUSMALLINT, :SQLLEN, :SQLULEN,
           :SQLSETPOSIROW, :SQLROWCOUNT, :SQLROWSETSIZE, :SQLTRANSID,
@@ -129,6 +122,8 @@ for t in [:SQLCHAR, :SQLSCHAR, :SQLWCHAR, :SQLDATE, :SQLDECIMAL,
     fn = Symbol(lowercase(string(t)))
     @eval $fn(x) = convert($t, x)
 end
+
+sqlwcar(x) = convert(sql_w_char(), x)
 
 # Data Type Mappings
 # SQL data types are returned in resultset metadata calls (ODBCMetadata)
@@ -415,9 +410,9 @@ const SQL2Julia = Dict(
     SQL_CHAR           => (SQLCHAR, Union{WeakRefString{SQLCHAR}, Missing}, false),
     SQL_VARCHAR        => (SQLCHAR, Union{WeakRefString{SQLCHAR}, Missing}, false),
     SQL_LONGVARCHAR    => (SQLCHAR, Union{String, Missing}, true),
-    SQL_WCHAR          => (SQLWCHAR, Union{WeakRefString{SQLWCHAR}, Missing}, false),
-    SQL_WVARCHAR       => (SQLWCHAR, Union{WeakRefString{SQLWCHAR}, Missing}, false),
-    SQL_WLONGVARCHAR   => (SQLWCHAR, Union{String, Missing}, true),
+    SQL_WCHAR          => (sql_w_char(), Union{WeakRefString{sql_w_char()}, Missing}, false),
+    SQL_WVARCHAR       => (sql_w_char(), Union{WeakRefString{sql_w_char()}, Missing}, false),
+    SQL_WLONGVARCHAR   => (sql_w_char(), Union{String, Missing}, true),
     SQL_DECIMAL        => (SQLCHAR, Union{Dec64, Missing}, false),
     SQL_NUMERIC        => (SQLCHAR, Union{Dec64, Missing}, false),
     SQL_SMALLINT       => (SQLSMALLINT, Union{SQLSMALLINT, Missing}, false),
@@ -504,3 +499,13 @@ const C_TYPES = Dict(
     SQL_TYPE_TIME      => "SQL_C_TYPE_TIME",
     SQL_TYPE_TIMESTAMP => "SQL_C_TYPE_TIMESTAMP",
     SQL_C_GUID         => "SQL_C_GUID")
+
+function __init__()
+    setODBC(ODBC.find_library())
+
+    # Update global SQL2Julia entries that are library dependent
+    T = sql_w_char()
+    SQL2Julia[SQL_WCHAR] = (T, Union{WeakRefString{T}, Missing}, false)
+    SQL2Julia[SQL_WVARCHAR] = (T, Union{WeakRefString{T}, Missing}, false)
+    SQL2Julia[SQL_WLONGVARCHAR] = (T, Union{String, Missing}, true)
+end

@@ -18,7 +18,7 @@ function ODBCDriverConnect!(dbc::Ptr{Void}, conn_string, prompt::Bool)
         driver_prompt = ODBC.API.SQL_DRIVER_NOPROMPT
         window_handle = C_NULL
     end
-    out_conn = Block(ODBC.API.SQLWCHAR, BUFLEN)
+    out_conn = Block(ODBC.API.sql_w_char(), BUFLEN)
     out_buff = Ref{Int16}()
     @CHECK dbc ODBC.API.SQL_HANDLE_DBC ODBC.API.SQLDriverConnect(dbc, window_handle, conn_string, out_conn.ptr, BUFLEN, out_buff, driver_prompt)
     connection_string = string(out_conn, out_buff[])
@@ -118,7 +118,7 @@ function Source(dsn::DSN, query::AbstractString; weakrefstrings::Bool=true, noqu
     #Allocate space for and fetch the name, type, size, etc. for each column
     len, dt, csize = Ref{ODBC.API.SQLSMALLINT}(), Ref{ODBC.API.SQLSMALLINT}(), Ref{ODBC.API.SQLULEN}()
     digits, missing = Ref{ODBC.API.SQLSMALLINT}(), Ref{ODBC.API.SQLSMALLINT}()
-    cname = ODBC.Block(ODBC.API.SQLWCHAR, ODBC.BUFLEN)
+    cname = ODBC.Block(ODBC.API.sql_w_char(), ODBC.BUFLEN)
     for x = 1:cols
         ODBC.API.SQLDescribeCol(stmt, x, cname.ptr, ODBC.BUFLEN, len, dt, csize, digits, missing)
         cnames[x] = string(cname, len[])
